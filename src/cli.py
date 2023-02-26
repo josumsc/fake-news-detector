@@ -24,6 +24,11 @@ def cli():
     help='Name of the model to save.'
 )
 @click.option(
+    '--lr',
+    default=2e-5,
+    help='Learning rate.'
+)
+@click.option(
     '--batch_size',
     default=16,
     help='Batch size.'
@@ -33,9 +38,9 @@ def cli():
     default=3,
     help='Number of epochs.'
 )
-def train(dataset: str, checkpoint: str, output: str, batch_size: int, epochs: int):
+def train(dataset: str, checkpoint: str, output: str, lr: float, batch_size: int, epochs: int):
     pipeline = DetectorPipeline(dataset_name=dataset, checkpoint=checkpoint, model_name=output)
-    model = pipeline.train_model(epochs=epochs, batch_size=batch_size)
+    model = pipeline.train_pipeline(epochs=epochs, lr=lr, batch_size=batch_size)
     pipeline.save_model(model)
     click.echo(f'Model saved into directory ./models/{output}.')
 

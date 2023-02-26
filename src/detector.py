@@ -10,6 +10,8 @@ from transformers import (
 )
 import datasets
 
+from typing import Tuple
+
 import torch
 from torch.utils.data import DataLoader
 
@@ -49,7 +51,7 @@ class DetectorPipeline:
         dataset = datasets.load_dataset(self.dataset_name)
         return dataset
 
-    def get_tokenizer_and_model(self) -> (AutoTokenizer, AutoModelForSequenceClassification):
+    def get_tokenizer_and_model(self) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
         """Get tokenizer and model from model name.
 
         :return: Tokenizer and Model objects.
@@ -72,15 +74,19 @@ class DetectorPipeline:
         data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
         return data_collator
 
-    def get_dataloaders(self, dataset: datasets.DatasetDict, tokenizer: AutoTokenizer, data_collator: DataCollatorWithPadding) -> (DataLoader, DataLoader, DataLoader):
+    def get_dataloaders(self, dataset: datasets.DatasetDict, batch_size: int, tokenizer: AutoTokenizer, data_collator: DataCollatorWithPadding) -> Tuple[DataLoader, DataLoader, DataLoader]:
         """_summary_
 
         :param dataset: Train dataset.
         :type dataset: datasets.DatasetDict
-        :param DataLoader: Eval dataset.
-        :type DataLoader: datasets.DatasetDict
-        :param DataLoader: Test dataset.
-        :type DataLoader: datasets.DatasetDict
+        :param batch_size: Batch size.
+        :type batch_size: int
+        :param tokenizer: Tokenizer object.
+        :type DataLoader: AutoTokenizer
+        :param data_collator: Data collator object.
+        :type data_collator: DataCollatorWithPadding
+        :return: Dataloaders for train, validation and test splits.
+        :rtype: (DataLoader, DataLoader, DataLoader)
         """
 
         # Tokenize dataset
@@ -96,13 +102,13 @@ class DetectorPipeline:
 
         # Create dataloaders
         train_dataloader = DataLoader(
-            tokenized_dataset["train"], shuffle=True, batch_size=32, collate_fn=data_collator
+            tokenized_dataset["train"], shuffle=True, batch_size=batch_size, collate_fn=data_collator
         )
         eval_dataloader = DataLoader(
-            tokenized_dataset["validation"], batch_size=32, collate_fn=data_collator
+            tokenized_dataset["validation"], batch_size=batch_size, collate_fn=data_collator
         )
         test_dataloader = DataLoader(
-            tokenized_dataset["test"], batch_size=32, collate_fn=data_collator
+            tokenized_dataset["test"], batch_size=batch_size, collate_fn=data_collator
         )
         return train_dataloader, eval_dataloader, test_dataloader
 
@@ -158,7 +164,6 @@ class DetectorPipeline:
                     optimizer.step()
                     scheduler.step()
                     optimizer.zero_grad()
-                    pbar.write(f'processed: {i * (epoch + 1) / num_training_steps * 100:.2f}%')
                     pbar.update(1)
 
         return model
@@ -193,23 +198,35 @@ class DetectorPipeline:
             predictions.extend(running_predictions)
 
         print("Results of the model:\n")
-        f1score = f1_score(dataset["validation"]["labels"], predictions, average="macro")
+        f1score = f1_score(dataset["validation"]["label"], predictions, average="macro")
         print(f"F1 score: {f1score}")
-        print(classification_report(dataset["validation"]["labels"], predictions))
-        print(confusion_matrix(dataset["validation"]["labels"], predictions))
+        print(classification_report(dataset["validation"]["label"], predictions))
+        print(confusion_matrix(dataset["validation"]["label"], predictions))
 
         return f1score
     
-    def train_pipeline(self) -> AutoModelForSequenceClassification:
+    def train_pipeline(self, epochs: int = 3, lr: float = 2e-5, batch_size: int = 16) -> AutoModelForSequenceClassification:
         """Runs the train pipeline and returns the trained model.
 
+        :param epochs: Number of epochs to train, defaults to 3
+        :type epochs: int, optional
+        :param lr: Learning rate, defaults to 2e-5
+        :type lr: float, optional
+        :param batch_size: Batch size, defaults to 16
+        :type batch_size: int, optional
         :return: Trained model.
         :rtype: AutoModelForSequenceClassification
         """
-        dataset = self.load_dataset()
-        train_dataloader, eval_dataloader, test_dataloader = self.tokenize_dataset(dataset)
-        model = self.load_model()
-        model = self.train_model(model, train_dataloader)
+        dataset = self.download_dataset()
+        tokenizer, model = self.get_tokenizer_and_model()
+        data_collator = self.get_data_collator(tokenizer)
+        train_dataloader, eval_dataloader, test_dataloader = self.get_dataloaders(
+            dataset,
+            batch_size=batch_size,
+            tokenizer=tokenizer,
+            data_collator=data_collator,
+        )
+        model = self.train_model(model, train_dataloader, epochs=epochs, lr=lr)
         self.evaluate_model(dataset, eval_dataloader, model)
         return model
 
