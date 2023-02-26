@@ -27,11 +27,11 @@ This will start the API REST in the port 5000. You can test it using the followi
 curl -X POST -H "Content-Type: application/json" -d '{"text": "This is a fake news"}' http://localhost:5000/predict
 ```
 
-![API REST](https://raw.githubusercontent.com/josumsc/fake-news-detector/master/docs/img/api-rest.png)
+![API REST](https://github.com/josumsc/fake-news-detector/blob/master/docs/img/api-rest.png?raw=true)
 
 At the same time, you can also use a simple HTML based interface to test the API REST. You can access it in the following URL: http://localhost:5000 and fill the form there to test the model.
 
-![HTML interface](https://raw.githubusercontent.com/josumsc/fake-news-detector/master/docs/img/html-interface.png)
+![HTML interface](https://github.com/josumsc/fake-news-detector/blob/master/docs/img/html-interface.png?raw=true)
 
 ### Retrain the model and publish it to Hugging Face's model hub
 
