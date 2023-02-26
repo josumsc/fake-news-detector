@@ -1,8 +1,6 @@
 import os
 from tqdm import tqdm
 
-from typing import Tuple
-
 from transformers import (
     get_scheduler,
     AutoTokenizer,
@@ -51,7 +49,7 @@ class DetectorPipeline:
         dataset = datasets.load_dataset(self.dataset_name)
         return dataset
 
-    def get_tokenizer_and_model(self) -> Tuple(AutoTokenizer, AutoModelForSequenceClassification):
+    def get_tokenizer_and_model(self) -> (AutoTokenizer, AutoModelForSequenceClassification):
         """Get tokenizer and model from model name.
 
         :return: Tokenizer and Model objects.
@@ -74,7 +72,7 @@ class DetectorPipeline:
         data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
         return data_collator
 
-    def get_dataloaders(self, dataset: datasets.DatasetDict, tokenizer: AutoTokenizer, data_collator: DataCollatorWithPadding) -> Tuple(DataLoader, DataLoader, DataLoader):
+    def get_dataloaders(self, dataset: datasets.DatasetDict, tokenizer: AutoTokenizer, data_collator: DataCollatorWithPadding) -> (DataLoader, DataLoader, DataLoader):
         """_summary_
 
         :param dataset: Train dataset.
@@ -224,5 +222,30 @@ class DetectorPipeline:
         :rtype: AutoModelForSequenceClassification
         """
         load_path = os.path.join("models", model_name) if model_name else os.path.join("models", self.model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(load_path)
+        model = AutoModelForSequenceClassification.from_pretrained(load_path, local_files_only=True)
         return model
+
+    def predict(self, model: AutoModelForSequenceClassification, text: str) -> int:
+        """Predict class of text.
+
+        :param model: Model to use for prediction.
+        :type model: AutoModelForSequenceClassification
+        :param text: Text to predict.
+        :type text: str
+        :return: Predicted class.
+        :rtype: int
+        """
+        # Set device
+        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        model.to(device)
+
+        # Predict
+        model.eval()
+        tokenizer = AutoTokenizer.from_pretrained(self.checkpoint)
+        encoded_text = tokenizer(text, truncation=True, padding=True, return_tensors="pt")
+        encoded_text = {k: v.to(device) for k, v in encoded_text.items()}
+        with torch.no_grad():
+            outputs = model(**encoded_text)
+        logits = outputs.logits
+        prediction = torch.argmax(logits, dim=-1).to('cpu').numpy().tolist()[0]
+        return prediction
