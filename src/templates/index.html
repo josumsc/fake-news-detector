@@ -6,13 +6,13 @@
     <body>
         <h1>Powered by HuggingFace and PyTorch</h1>
         <p>This app is conceived to be used as an API REST, although this particular endpoint serves as an entrypoint where we can test the functionalities using a form.</p>
-        <form name="input" action="/detect" method="post">
+        <form name="input" action="/detect_html" method="post">
             <label for="text">Text to detect:</label>
             <input type="text" id="text" name="text" value="The president of the United States is Donald Trump.">
             <input type="submit" value="Submit">
         </form>
-        {% if inference %}
-            <p>Prediction: {{inference}}</p>
+        {% if result %}
+            <p>Result: {{result}}</p>
             <p>Logits: {{logits}}</p>
         {% endif %}
     </body>
