@@ -51,15 +51,17 @@ class DetectorPipeline:
         dataset = datasets.load_dataset(self.dataset_name)
         return dataset
 
-    def get_tokenizer_and_model(self) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
+    def get_tokenizer_and_model(self, checkpoint: str = None) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
         """Get tokenizer and model from model name.
 
+        :param checkpoint: Name of the model to fine-tune, defaults to None
+        :type checkpoint: str, optional
         :return: Tokenizer and Model objects.
         :rtype: (AutoTokenizer, AutoModelForSequenceClassification)
         """
-
-        tokenizer = AutoTokenizer.from_pretrained(self.checkpoint)
-        model = AutoModelForSequenceClassification.from_pretrained(self.checkpoint, num_labels=2)
+        model_name = checkpoint if checkpoint else self.checkpoint
+        tokenizer = AutoTokenizer.from_pretrained(model_name)
+        model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
         return tokenizer, model
 
     def get_data_collator(self, tokenizer: AutoTokenizer) -> DataCollatorWithPadding:
@@ -197,6 +199,7 @@ class DetectorPipeline:
             running_predictions = torch.argmax(logits, dim=-1).to('cpu').numpy().tolist()
             predictions.extend(running_predictions)
 
+        # Print results
         print("Results of the model:\n")
         f1score = f1_score(dataset["validation"]["label"], predictions, average="macro")
         print(f"F1 score: {f1score}")
@@ -228,23 +231,29 @@ class DetectorPipeline:
         )
         model = self.train_model(model, train_dataloader, epochs=epochs, lr=lr)
         self.evaluate_model(dataset, eval_dataloader, model)
+        model.save_pretrained(os.path.join("models", self.model_name))
+        tokenizer.save_pretrained(os.path.join("models", self.model_name))
+
         return model
 
-    def load_model_from_directory(self, model_name: str = None) -> AutoModelForSequenceClassification:
+    def load_model_from_directory(self, model_name: str = None) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
         """Load model from directory.
 
         :param model_name: Name of the model to load, if None, self.model_name is used, defaults to None.
         :type model_name: str
-        :return: Loaded model.
-        :rtype: AutoModelForSequenceClassification
+        :return: Loaded tokenizer and model.
+        :rtype: (AutoTokenizer, AutoModelForSequenceClassification
         """
         load_path = os.path.join("models", model_name) if model_name else os.path.join("models", self.model_name)
+        tokenizer = AutoTokenizer.from_pretrained(load_path, local_files_only=True)
         model = AutoModelForSequenceClassification.from_pretrained(load_path, local_files_only=True)
-        return model
+        return tokenizer, model
 
-    def predict(self, model: AutoModelForSequenceClassification, text: str) -> int:
+    def predict(self, tokenizer: AutoTokenizer, model: AutoModelForSequenceClassification, text: str) -> int:
         """Predict class of text.
 
+        :param tokenizer: Tokenizer to use for prediction.
+        :type tokenizer: AutoTokenizer
         :param model: Model to use for prediction.
         :type model: AutoModelForSequenceClassification
         :param text: Text to predict.
@@ -258,14 +267,13 @@ class DetectorPipeline:
 
         # Predict
         model.eval()
-        tokenizer = AutoTokenizer.from_pretrained(self.checkpoint)
         encoded_text = tokenizer(text, truncation=True, padding=True, return_tensors="pt")
         encoded_text = {k: v.to(device) for k, v in encoded_text.items()}
         with torch.no_grad():
             outputs = model(**encoded_text)
         logits = outputs.logits
         prediction = torch.argmax(logits, dim=-1).to('cpu').numpy().tolist()[0]
-        return prediction
+        return prediction, logits
 
     def publish_model_from_directory(self, model_name: str = None) -> None:
         """Publish model to Hugging Face Hub from the specified directory.
@@ -277,6 +285,7 @@ class DetectorPipeline:
         :rtype: None
         """
         model_name = model_name if model_name else self.model_name
-        model = self.load_model_from_directory(model_name=model_name)
+        tokenizer, model = self.load_model_from_directory(model_name=model_name)
+        tokenizer.push_to_hub(model_name)
         model.push_to_hub(model_name)
         return None

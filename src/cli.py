@@ -40,8 +40,7 @@ def cli():
 )
 def train(dataset: str, checkpoint: str, output: str, lr: float, batch_size: int, epochs: int):
     pipeline = DetectorPipeline(dataset_name=dataset, checkpoint=checkpoint, model_name=output)
-    model = pipeline.train_pipeline(epochs=epochs, lr=lr, batch_size=batch_size)
-    pipeline.save_model(model)
+    pipeline.train_pipeline(epochs=epochs, lr=lr, batch_size=batch_size)
     click.echo(f'Model saved into directory ./models/{output}.')
 
 @click.command(name='predict')
@@ -62,9 +61,10 @@ def train(dataset: str, checkpoint: str, output: str, lr: float, batch_size: int
 )
 def predict(model: str, checkpoint:str, text: str):
     pipeline = DetectorPipeline(model_name=model, checkpoint=checkpoint)
-    model = pipeline.load_model_from_directory()
-    prediction = pipeline.predict(model, text)
+    tokenizer, model = pipeline.load_model_from_directory()
+    prediction, logits = pipeline.predict(tokenizer, model, text)
     click.echo(f'Prediction: {prediction}')
+    click.echo(f'Logits: {logits}')
 
 @click.command(name='publish')
 @click.option(
