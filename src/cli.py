@@ -66,8 +66,21 @@ def predict(model: str, checkpoint:str, text: str):
     prediction = pipeline.predict(model, text)
     click.echo(f'Prediction: {prediction}')
 
+@click.command(name='publish')
+@click.option(
+    '--model',
+    default='fake-news-detector',
+    help='Model to publish.'
+)
+def publish(model: str):
+    pipeline = DetectorPipeline(model_name=model)
+    pipeline.publish_model_from_directory()
+    cli.echo('Model published into HuggingFace Hub.')
+
+
 cli.add_command(train)
 cli.add_command(predict)
+cli.add_command(publish)
 
 if __name__ == '__main__':
     cli()

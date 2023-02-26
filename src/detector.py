@@ -266,3 +266,17 @@ class DetectorPipeline:
         logits = outputs.logits
         prediction = torch.argmax(logits, dim=-1).to('cpu').numpy().tolist()[0]
         return prediction
+
+    def publish_model_from_directory(self, model_name: str = None) -> None:
+        """Publish model to Hugging Face Hub from the specified directory.
+        Both the model in the directory and the model on the Hub must have the same name.
+
+        :param model_name: Name of the model to publish, if None, self.model_name is used, defaults to None.
+        :type model_name: str
+        :return: None
+        :rtype: None
+        """
+        model_name = model_name if model_name else self.model_name
+        model = self.load_model_from_directory(model_name=model_name)
+        model.push_to_hub(model_name)
+        return None
