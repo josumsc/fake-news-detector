@@ -24,7 +24,7 @@ docker run -p 5000:5000 josumsc/flask-fake-news
 This will start the API REST in the port 5000. You can test it using the following command:
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"text": "This is a fake news"}' http://localhost:5000/predict
+curl -X POST -H "Content-Type: application/json" -d '{"text": "This is a fake news"}' http://localhost:5000/detect_json
 ```
 
 ![API REST](https://github.com/josumsc/fake-news-detector/blob/master/docs/img/api-rest.png?raw=true)
