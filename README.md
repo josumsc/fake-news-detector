@@ -9,29 +9,45 @@ The model is located both in [Hugging Face's model hub](https://huggingface.co/j
 
 ## Usage
 
-### Docker
+### Docker Compose
 
-If you want to use the Docker image, you can pull it from Docker Hub and run it.
+There is a `Makefile` that calls the `docker-compose` command to run the API REST. You can use it to run the API REST in a container.
+
+```bash
+# Run the API REST
+make run
+```
+
+This instruction will run the command on daemon mode, so in case you want to stop it you can run:
+
+```bash
+# Stop the API REST
+make stop
+```
+
+The `make run` command will start the API REST in the port 5001. You can test it using the following command:
+
+```bash
+curl -X POST -H "Content-Type: application/json" -d '{"text": "This is a fake news"}' http://localhost:5001/detect_json
+```
+
+![API REST](https://github.com/josumsc/fake-news-detector/blob/master/docs/img/api-rest.png?raw=true)
+
+At the same time, you can also use a simple HTML based interface to test the API REST. You can access it in the following URL: [http://localhost:5001](http://localhost:5001) and fill the form there to test the model.
+
+![HTML interface](https://github.com/josumsc/fake-news-detector/blob/master/docs/img/html-interface.png?raw=true)
+
+### Docker Image
+
+If you want to use the Docker image on your own applications without the `docker-compose.yml` proposed, you can pull it from Docker Hub and run it.
 
 ```bash
 # Pull the image
 docker pull josumsc/flask-fake-news
 
 # Run the container
-docker run -p 5000:5000 josumsc/flask-fake-news
+docker run -p 5001:5000 josumsc/flask-fake-news
 ```
-
-This will start the API REST in the port 5000. You can test it using the following command:
-
-```bash
-curl -X POST -H "Content-Type: application/json" -d '{"text": "This is a fake news"}' http://localhost:5000/detect_json
-```
-
-![API REST](https://github.com/josumsc/fake-news-detector/blob/master/docs/img/api-rest.png?raw=true)
-
-At the same time, you can also use a simple HTML based interface to test the API REST. You can access it in the following URL: http://localhost:5000 and fill the form there to test the model.
-
-![HTML interface](https://github.com/josumsc/fake-news-detector/blob/master/docs/img/html-interface.png?raw=true)
 
 ### Retrain the model and publish it to Hugging Face's model hub
 
