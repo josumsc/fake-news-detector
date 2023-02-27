@@ -15,19 +15,16 @@ from typing import Tuple
 import torch
 from torch.utils.data import DataLoader
 
-from sklearn.metrics import (
-    confusion_matrix,
-    classification_report,
-    f1_score
-)
+from sklearn.metrics import confusion_matrix, classification_report, f1_score
+
 
 class DetectorPipeline:
     def __init__(
-            self,
-            dataset_name: str = "GonzaloA/fake_news",
-            checkpoint: str = "distilbert-base-uncased-finetuned-sst-2-english",
-            model_name: str = "fake_news_detector"
-        ):
+        self,
+        dataset_name: str = "GonzaloA/fake_news",
+        checkpoint: str = "distilbert-base-uncased-finetuned-sst-2-english",
+        model_name: str = "fake_news_detector",
+    ):
         """Detector pipeline class.
 
         :param dataset_name: Name of the dataset to download, defaults to "GonzaloA/fake_news"
@@ -51,7 +48,9 @@ class DetectorPipeline:
         dataset = datasets.load_dataset(self.dataset_name)
         return dataset
 
-    def get_tokenizer_and_model(self, checkpoint: str = None) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
+    def get_tokenizer_and_model(
+        self, checkpoint: str = None
+    ) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
         """Get tokenizer and model from model name.
 
         :param checkpoint: Name of the model to fine-tune, defaults to None
@@ -61,7 +60,9 @@ class DetectorPipeline:
         """
         model_name = checkpoint if checkpoint else self.checkpoint
         tokenizer = AutoTokenizer.from_pretrained(model_name)
-        model = AutoModelForSequenceClassification.from_pretrained(model_name, num_labels=2)
+        model = AutoModelForSequenceClassification.from_pretrained(
+            model_name, num_labels=2
+        )
         return tokenizer, model
 
     def get_data_collator(self, tokenizer: AutoTokenizer) -> DataCollatorWithPadding:
@@ -76,7 +77,13 @@ class DetectorPipeline:
         data_collator = DataCollatorWithPadding(tokenizer=tokenizer)
         return data_collator
 
-    def get_dataloaders(self, dataset: datasets.DatasetDict, batch_size: int, tokenizer: AutoTokenizer, data_collator: DataCollatorWithPadding) -> Tuple[DataLoader, DataLoader, DataLoader]:
+    def get_dataloaders(
+        self,
+        dataset: datasets.DatasetDict,
+        batch_size: int,
+        tokenizer: AutoTokenizer,
+        data_collator: DataCollatorWithPadding,
+    ) -> Tuple[DataLoader, DataLoader, DataLoader]:
         """_summary_
 
         :param dataset: Train dataset.
@@ -94,27 +101,43 @@ class DetectorPipeline:
         # Tokenize dataset
         def tokenize_function(example):
             return tokenizer(example["text"], truncation=True, padding=True)
-        
+
         tokenized_dataset = dataset.map(tokenize_function, batched=True)
 
         # Put in format that the model expects
-        tokenized_dataset = tokenized_dataset.remove_columns(["Unnamed: 0", "title", "text"])
+        tokenized_dataset = tokenized_dataset.remove_columns(
+            ["Unnamed: 0", "title", "text"]
+        )
         tokenized_dataset = tokenized_dataset.rename_column("label", "labels")
         tokenized_dataset.set_format("torch")
 
         # Create dataloaders
         train_dataloader = DataLoader(
-            tokenized_dataset["train"], shuffle=True, batch_size=batch_size, collate_fn=data_collator
+            tokenized_dataset["train"],
+            shuffle=True,
+            batch_size=batch_size,
+            collate_fn=data_collator,
         )
         eval_dataloader = DataLoader(
-            tokenized_dataset["validation"], batch_size=batch_size, collate_fn=data_collator
+            tokenized_dataset["validation"],
+            batch_size=batch_size,
+            collate_fn=data_collator,
         )
         test_dataloader = DataLoader(
             tokenized_dataset["test"], batch_size=batch_size, collate_fn=data_collator
         )
         return train_dataloader, eval_dataloader, test_dataloader
 
-    def train_model(self, model: AutoModelForSequenceClassification, train_dataloader: DataLoader, epochs: int = 3, lr: float = 2e-5, weight_decay: float = 0.0, warmup_steps: int = 0, max_grad_norm: float = 1.0) -> AutoModelForSequenceClassification:
+    def train_model(
+        self,
+        model: AutoModelForSequenceClassification,
+        train_dataloader: DataLoader,
+        epochs: int = 3,
+        lr: float = 2e-5,
+        weight_decay: float = 0.0,
+        warmup_steps: int = 0,
+        max_grad_norm: float = 1.0,
+    ) -> AutoModelForSequenceClassification:
         """Train model.
 
         :param model: Model to train.
@@ -138,7 +161,9 @@ class DetectorPipeline:
         num_training_steps = len(train_dataloader) * epochs
 
         # Set device
-        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
         model.to(device)
 
         # Set optimizer
@@ -155,9 +180,9 @@ class DetectorPipeline:
         # Train
         pbar = tqdm(range(num_training_steps))
         with tqdm(total=num_training_steps) as pbar:
-            for epoch in range(epochs):
+            for _ in range(epochs):
                 model.train()
-                for i, batch in enumerate(train_dataloader):
+                for batch in train_dataloader:
                     batch = {k: v.to(device) for k, v in batch.items()}
                     outputs = model(**batch)
                     loss = outputs.loss
@@ -170,7 +195,12 @@ class DetectorPipeline:
 
         return model
 
-    def evaluate_model(self, dataset: datasets.Dataset, dataloader: DataLoader, model: AutoModelForSequenceClassification) -> float:
+    def evaluate_model(
+        self,
+        dataset: datasets.Dataset,
+        dataloader: DataLoader,
+        model: AutoModelForSequenceClassification,
+    ) -> float:
         """Evaluate model.
 
         :param eval_dataloader: dataset to evaluate.
@@ -184,7 +214,9 @@ class DetectorPipeline:
         """
 
         # Set device
-        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
         model.to(device)
 
         # Evaluate
@@ -196,7 +228,9 @@ class DetectorPipeline:
             with torch.no_grad():
                 outputs = model(**batch)
             logits = outputs.logits
-            running_predictions = torch.argmax(logits, dim=-1).to('cpu').numpy().tolist()
+            running_predictions = (
+                torch.argmax(logits, dim=-1).to("cpu").numpy().tolist()
+            )
             predictions.extend(running_predictions)
 
         # Print results
@@ -207,8 +241,10 @@ class DetectorPipeline:
         print(confusion_matrix(dataset["validation"]["label"], predictions))
 
         return f1score
-    
-    def train_pipeline(self, epochs: int = 3, lr: float = 2e-5, batch_size: int = 16) -> AutoModelForSequenceClassification:
+
+    def train_pipeline(
+        self, epochs: int = 3, lr: float = 2e-5, batch_size: int = 16
+    ) -> AutoModelForSequenceClassification:
         """Runs the train pipeline and returns the trained model.
 
         :param epochs: Number of epochs to train, defaults to 3
@@ -223,7 +259,7 @@ class DetectorPipeline:
         dataset = self.download_dataset()
         tokenizer, model = self.get_tokenizer_and_model()
         data_collator = self.get_data_collator(tokenizer)
-        train_dataloader, eval_dataloader, test_dataloader = self.get_dataloaders(
+        train_dataloader, eval_dataloader, _ = self.get_dataloaders(
             dataset,
             batch_size=batch_size,
             tokenizer=tokenizer,
@@ -236,7 +272,9 @@ class DetectorPipeline:
 
         return model
 
-    def load_model_from_directory(self, model_name: str = None) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
+    def load_model_from_directory(
+        self, model_name: str = None
+    ) -> Tuple[AutoTokenizer, AutoModelForSequenceClassification]:
         """Load model from directory.
 
         :param model_name: Name of the model to load, if None, self.model_name is used, defaults to None.
@@ -244,12 +282,23 @@ class DetectorPipeline:
         :return: Loaded tokenizer and model.
         :rtype: (AutoTokenizer, AutoModelForSequenceClassification
         """
-        load_path = os.path.join("models", model_name) if model_name else os.path.join("models", self.model_name)
+        load_path = (
+            os.path.join("models", model_name)
+            if model_name
+            else os.path.join("models", self.model_name)
+        )
         tokenizer = AutoTokenizer.from_pretrained(load_path, local_files_only=True)
-        model = AutoModelForSequenceClassification.from_pretrained(load_path, local_files_only=True)
+        model = AutoModelForSequenceClassification.from_pretrained(
+            load_path, local_files_only=True
+        )
         return tokenizer, model
 
-    def predict(self, tokenizer: AutoTokenizer, model: AutoModelForSequenceClassification, text: str) -> int:
+    def predict(
+        self,
+        tokenizer: AutoTokenizer,
+        model: AutoModelForSequenceClassification,
+        text: str,
+    ) -> int:
         """Predict class of text.
 
         :param tokenizer: Tokenizer to use for prediction.
@@ -262,17 +311,21 @@ class DetectorPipeline:
         :rtype: int
         """
         # Set device
-        device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        device = (
+            torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
+        )
         model.to(device)
 
         # Predict
         model.eval()
-        encoded_text = tokenizer(text, truncation=True, padding=True, return_tensors="pt")
+        encoded_text = tokenizer(
+            text, truncation=True, padding=True, return_tensors="pt"
+        )
         encoded_text = {k: v.to(device) for k, v in encoded_text.items()}
         with torch.no_grad():
             outputs = model(**encoded_text)
         logits = outputs.logits
-        prediction = torch.argmax(logits, dim=-1).to('cpu').numpy().tolist()[0]
+        prediction = torch.argmax(logits, dim=-1).to("cpu").numpy().tolist()[0]
         return prediction, logits
 
     def publish_model_from_directory(self, model_name: str = None) -> None:
